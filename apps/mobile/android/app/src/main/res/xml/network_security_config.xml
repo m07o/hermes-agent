@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Release builds speak TLS to a Hermes server, and only TLS. The auth gate
+  already refuses to serve a non-loopback bind without a provider, so a session
+  cookie set over plain http on a public address would be the weakest link left.
+
+  Cleartext stays allowed for on-device addresses only: a gateway running in
+  Termux on this same phone (127.0.0.1) and the emulator's route to its host
+  (10.0.2.2). A LAN address over http:// is a debug-build convenience — see
+  app/src/debug/AndroidManifest.xml.
+-->
+<network-security-config>
+    <base-config cleartextTrafficPermitted="false" />
+    <domain-config cleartextTrafficPermitted="true">
+        <domain includeSubdomains="false">localhost</domain>
+        <domain includeSubdomains="false">127.0.0.1</domain>
+        <domain includeSubdomains="false">10.0.2.2</domain>
+    </domain-config>
+</network-security-config>

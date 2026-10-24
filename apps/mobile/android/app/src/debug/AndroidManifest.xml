@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Debug-only: allow plain http:// to a Hermes server on the LAN
+  (http://192.168.1.20:9119), which is how most people first point a phone at a
+  home server. Release builds keep the main manifest's TLS-only policy — see
+  res/xml/network_security_config.xml.
+-->
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <application android:usesCleartextTraffic="true" />
+</manifest>

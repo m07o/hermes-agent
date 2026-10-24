@@ -1,0 +1,67 @@
+@import 'tailwindcss';
+
+/* Hermes Mobile shell — the dashboard's own dark palette, reduced to what a
+   phone-sized connector screen needs. Brand accent is the docs gold. */
+@theme {
+  --color-ink: #0b0b0d;
+  --color-panel: #131317;
+  --color-panel-raised: #1a1a20;
+  --color-line: #26262e;
+  --color-line-soft: #1e1e25;
+  --color-gold: #ffd700;
+  --color-mint: #4ade80;
+  --color-amber: #fbbf24;
+  --color-rose: #fb7185;
+  --color-text-primary: #f4f4f6;
+  --color-text-secondary: #a8a8b3;
+  --color-text-tertiary: #7c7c88;
+}
+
+@layer base {
+  html,
+  body,
+  #root {
+    height: 100%;
+  }
+
+  body {
+    margin: 0;
+    background-color: var(--color-ink);
+    color: var(--color-text-primary);
+    font-family:
+      ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+    -webkit-font-smoothing: antialiased;
+    overscroll-behavior-y: none;
+  }
+
+  /* Tap targets stay put: no text selection on chrome, no blue flash. */
+  button {
+    -webkit-tap-highlight-color: transparent;
+    touch-action: manipulation;
+  }
+
+  input,
+  textarea {
+    font-size: 16px; /* below 16px iOS/Android WebViews zoom the page on focus */
+  }
+}
+
+@layer utilities {
+  .safe-top {
+    padding-top: env(safe-area-inset-top, 0px);
+  }
+
+  .safe-bottom {
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+  }
+
+  .brand-wordmark {
+    font-weight: 700;
+    letter-spacing: 0.22em;
+    text-transform: uppercase;
+  }
+
+  .mono {
+    font-family: ui-monospace, SFMono-Regular, 'SF Mono', Menlo, Consolas, monospace;
+  }
+}
