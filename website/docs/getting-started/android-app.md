@@ -78,7 +78,10 @@ the same debug APK and uploads it as an artifact. It is staged at
 `apps/mobile/ci/mobile-android.yml` — GitHub only runs workflows from
 `.github/workflows/`, so a maintainer activates it with
 `git mv apps/mobile/ci/mobile-android.yml .github/workflows/`. Once active it runs
-on changes to `apps/mobile/` and on demand from the **Actions** tab.
+on changes to `apps/mobile/` and on demand from the **Actions** tab. A second
+staged workflow, `apps/mobile/ci/mobile-release.yml`, builds *signed* release
+APK + AAB on `mobile-v*` tags and publishes them as a GitHub Release; see
+`apps/mobile/RELEASE.md` in the repository for the keystore and secret setup.
 
 Install it on the phone:
 

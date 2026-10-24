@@ -1,0 +1,153 @@
+name: Hermes Mobile release
+
+# Cuts a distributable build of the Android app in apps/mobile:
+#   * signed release APK + AAB when the signing secrets exist,
+#   * a GitHub Release with both artifacts and SHA-256 sums on tag mobile-v*,
+#   * plain artifacts (no Release) when triggered by workflow_dispatch.
+#
+# THIS FILE IS STAGED, NOT ACTIVE. GitHub only runs workflows from
+# .github/workflows/, and this branch's push token has no `workflows`
+# permission, so it is committed here instead of being silently dropped.
+# Activate it with:
+#
+#   git mv apps/mobile/ci/mobile-release.yml .github/workflows/mobile-release.yml
+#
+# Signing secrets (all optional — without them the outputs are unsigned):
+#   HERMES_MOBILE_KEYSTORE_B64      base64 of the .jks / .keystore file
+#   HERMES_MOBILE_KEYSTORE_PASSWORD
+#   HERMES_MOBILE_KEY_ALIAS
+#   HERMES_MOBILE_KEY_PASSWORD
+# Create the keystore with apps/mobile/scripts/make-keystore.sh, then:
+#   base64 -w0 hermes-mobile.jks   (paste the output into the secret)
+
+on:
+  push:
+    tags: ['mobile-v*']
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version to stamp (e.g. 0.1.0). Tag pushes use the tag instead.'
+        required: false
+        default: '0.1.0'
+
+permissions:
+  contents: write
+
+concurrency:
+  group: mobile-release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  release:
+    name: Release APK + AAB
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    env:
+      HERMES_MOBILE_KEYSTORE_B64: ${{ secrets.HERMES_MOBILE_KEYSTORE_B64 }}
+      HERMES_MOBILE_KEYSTORE_PASSWORD: ${{ secrets.HERMES_MOBILE_KEYSTORE_PASSWORD }}
+      HERMES_MOBILE_KEY_ALIAS: ${{ secrets.HERMES_MOBILE_KEY_ALIAS }}
+      HERMES_MOBILE_KEY_PASSWORD: ${{ secrets.HERMES_MOBILE_KEY_PASSWORD }}
+    steps:
+      - uses: actions/checkout@f548e57e544e1ff5a4c46bf1e1b8685f8e4a348a # v7.0.1
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # 7.0.0
+        with:
+          node-version: 24.11.1
+
+      - uses: actions/setup-java@b843ebf9b913146b38da2eaa7aeddf76074ae1ad # v6.1.0
+        with:
+          distribution: temurin
+          java-version: '21'
+
+      # versionName = X.Y.Z, versionCode = X*10000 + Y*100 + Z, read by
+      # android/app/build.gradle from the environment.
+      - name: Resolve the version
+        id: version
+        run: |
+          if [ "${{ github.event_name }}" = "push" ]; then
+            TAG="${GITHUB_REF_NAME}"
+            VERSION="${TAG#mobile-v}"
+          else
+            TAG=""
+            VERSION="${{ inputs.version }}"
+          fi
+          IFS='.' read -r MAJOR MINOR PATCH <<< "$VERSION"
+          CODE=$(( MAJOR * 10000 + MINOR * 100 + PATCH ))
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+          echo "HERMES_MOBILE_VERSION_NAME=$VERSION" >> "$GITHUB_ENV"
+          echo "HERMES_MOBILE_VERSION_CODE=$CODE" >> "$GITHUB_ENV"
+
+      - name: Install workspace dependencies
+        run: npm ci --workspace apps/mobile --include-workspace-root=false --no-audit --no-fund
+
+      - name: Build the shell and sync it into the Android project
+        working-directory: apps/mobile
+        run: |
+          npm run build
+          npx cap sync android
+
+      - name: Materialize the release keystore (optional)
+        id: signing
+        run: |
+          if [ -n "$HERMES_MOBILE_KEYSTORE_B64" ]; then
+            KEYSTORE="$RUNNER_TEMP/hermes-mobile.jks"
+            printf '%s' "$HERMES_MOBILE_KEYSTORE_B64" | base64 -d > "$KEYSTORE"
+            echo "HERMES_MOBILE_KEYSTORE_PATH=$KEYSTORE" >> "$GITHUB_ENV"
+            echo "signed=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "::warning::No HERMES_MOBILE_KEYSTORE_* secrets configured; release outputs will be UNSIGNED."
+            echo "signed=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Assemble the release APK and AAB
+        working-directory: apps/mobile/android
+        run: ./gradlew assembleRelease bundleRelease --no-daemon --stacktrace
+
+      - name: Stage the outputs
+        id: stage
+        working-directory: apps/mobile/android
+        run: |
+          VERSION="${{ steps.version.outputs.version }}"
+          mkdir -p "$RUNNER_TEMP/release-out"
+          cp app/build/outputs/apk/release/app-release*.apk "$RUNNER_TEMP/release-out/hermes-mobile-$VERSION.apk"
+          cp app/build/outputs/bundle/release/app-release*.aab "$RUNNER_TEMP/release-out/hermes-mobile-$VERSION.aab"
+          ( cd "$RUNNER_TEMP/release-out" && sha256sum * > SHA256SUMS )
+          ls -l "$RUNNER_TEMP/release-out"
+
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: hermes-mobile-${{ steps.version.outputs.version }}
+          path: ${{ runner.temp }}/release-out/*
+          if-no-files-found: error
+          retention-days: 90
+
+      - name: Publish the GitHub Release
+        if: steps.version.outputs.tag != ''
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          VERSION="${{ steps.version.outputs.version }}"
+          TAG="${{ steps.version.outputs.tag }}"
+          OUT="$RUNNER_TEMP/release-out"
+          {
+            echo "Hermes Mobile $VERSION for Android (minSdk 24 / Android 7.0)."
+            echo
+            if [ "${{ steps.signing.outputs.signed }}" = "true" ]; then
+              echo "The APK is release-signed; install it with \`adb install hermes-mobile-$VERSION.apk\` or by opening the file on the device."
+            else
+              echo "**Unsigned build.** The APK was built without a release keystore, so Android will refuse to install it. Add the \`HERMES_MOBILE_KEYSTORE_*\` secrets (see apps/mobile/ci/mobile-release.yml) and re-run, or use the debug APK from the Hermes Mobile (Android) workflow."
+            fi
+            echo
+            echo "The AAB is for Play Store / app-store submission."
+            echo
+            echo '```'
+            cat "$OUT/SHA256SUMS"
+            echo '```'
+          } > "$RUNNER_TEMP/release-notes.md"
+          gh release create "$TAG" "$OUT"/* \
+            --repo "${{ github.repository }}" \
+            --title "Hermes Mobile $VERSION" \
+            --notes-file "$RUNNER_TEMP/release-notes.md"

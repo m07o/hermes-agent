@@ -89,16 +89,20 @@ Done, and verified as far as a sandbox without an Android SDK can verify:
   targetSdk 36, Java 21), then customized: `MainActivity.java`,
   `HermesShellPlugin.java`, TLS-only `network_security_config.xml`, debug-only
   cleartext for LAN testing.
-- CI: `ci/mobile-android.yml` builds a debug APK. It is staged, not active —
-  GitHub only runs workflows from `.github/workflows/`, and this branch's push
-  token has no `workflows` permission. `git mv` it there to turn it on.
+- CI: `ci/mobile-android.yml` builds a debug APK; `ci/mobile-release.yml`
+  builds a signed APK + AAB on `mobile-v*` tags and publishes a GitHub Release.
+  Both are staged, not active — GitHub only runs workflows from
+  `.github/workflows/`, and this branch's push token has no `workflows`
+  permission. `git mv` them there to turn them on.
 
 **Not verified:** the Gradle build has never run here (no JDK/SDK in this
 environment), and nothing has run on a device. First compile is expected to need
 small fixes; the two custom Java files are the only non-template code.
 
-Known cosmetic debt: the launcher icon is Capacitor's default. Generate real ones
-with `npx @capacitor/assets generate --android` from a 1024×1024 source.
+Launcher/splash art is generated from the repo's own brand icon
+(`apps/desktop/assets/icon-dark.png`) into the mipmap/drawable sets, with a
+dark adaptive-icon background; `apps/mobile/assets/` holds the 1024² and
+2732² sources for regeneration with `npx @capacitor/assets generate --android`.
 
 ## Phase 2 — behave like an app, not a browser tab
 
@@ -119,6 +123,11 @@ In rough priority order:
 3. **Release signing + a distributable build**: keystore in CI secrets,
    `bundleRelease`, and an internal distribution channel (Play internal testing
    or a self-hosted AAB). Debug APKs are not updatable across machines.
+   *Done in this repo:* opt-in signing (`keystore.properties` / env vars,
+   `scripts/make-keystore.sh`), env-stamped versioning, and the tag-driven
+   `mobile-release.yml` that attaches APK + AAB + SHA-256 to a GitHub Release.
+   *Still open:* the distribution channel itself (Play internal testing vs
+   self-hosted) and the first signed build once a keystore exists.
 4. **Reconnect resilience**: the dashboard's own WS reconnection
    (`web/src/lib/events-reconnect.ts`) plus `@capacitor/network` to surface
    offline state, and a "reconnect" affordance in the shell.

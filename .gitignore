@@ -97,6 +97,7 @@ apps/desktop/dist/
 # Capacitor webDir — `npm run build` regenerates it, and `cap sync android`
 # copies it into android/app/src/main/assets/public (ignored by android/.gitignore)
 apps/mobile/dist/
+apps/mobile/android/keystore.properties
 
 # tsc-emitted artifacts (a stray `tsc -b` compiles into src/, and vite then
 # resolves the stale .js OVER the .tsx — never track these)

@@ -69,18 +69,21 @@ npm run android:apk             # needs ANDROID_HOME + JDK 21 → android/app/bu
 npm run cap:open                # or open the project in Android Studio
 ```
 
-`ci/mobile-android.yml` builds a debug APK in CI and uploads it as an artifact, so
-an installable build does not require a local Android SDK. It is staged rather
-than active — GitHub only runs workflows from `.github/workflows/`, and this
+Getting an installable build (debug APK from CI, signed release APK/AAB from a
+tag, or a local Android Studio build) is documented in
+[`RELEASE.md`](./RELEASE.md). The two build workflows are staged rather than
+active — GitHub only runs workflows from `.github/workflows/`, and this
 branch's push token has no `workflows` permission:
 
 ```bash
 git mv apps/mobile/ci/mobile-android.yml .github/workflows/mobile-android.yml
+git mv apps/mobile/ci/mobile-release.yml .github/workflows/mobile-release.yml
 ```
 
-Install on a phone with `adb install -r app-debug.apk`, or serve the artifact
-over a local file share. The debug build is signed with the debug keystore and
-is not Play-Store distributable.
+Install on a phone with `adb install -r hermes-mobile-*.apk`, or by opening the
+file on the device. The debug build is signed with the debug keystore and is
+not Play-Store distributable; release signing is opt-in via
+`scripts/make-keystore.sh`.
 
 ## Pointing it at a server
 

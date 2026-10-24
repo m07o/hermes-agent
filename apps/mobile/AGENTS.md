@@ -58,8 +58,8 @@ and never edit `capacitor.settings.gradle` / `app/capacitor.build.gradle`
   additive: `npm install --workspace apps/mobile --include-workspace-root=false`,
   then check `git diff --stat package-lock.json` for churn in unrelated entries.
 - **Native edits are unverifiable without an SDK.** Say so in the PR body; CI
-  (`ci/mobile-android.yml`, staged — `git mv` it into `.github/workflows/` to
-  activate) is the first real compile.
+  (`ci/mobile-android.yml` + `ci/mobile-release.yml`, staged — `git mv` them
+  into `.github/workflows/` to activate) is the first real compile.
 
 ## Security notes for reviewers
 
