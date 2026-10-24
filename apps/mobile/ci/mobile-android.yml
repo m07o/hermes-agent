@@ -34,7 +34,9 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: read
+  # read for the checkout; write so the apk job can publish the built APK to
+  # the stable `mobile-latest` GitHub Release (one permanent download link).
+  contents: write
 
 concurrency:
   group: mobile-android-${{ github.ref }}
@@ -110,3 +112,31 @@ jobs:
           path: apps/mobile/android/app/build/outputs/apk/debug/*.apk
           if-no-files-found: error
           retention-days: 14
+
+      # Artifacts expire and are fiddly to find; keep one permanent, public
+      # download link by (re)publishing the APK to the `mobile-latest` release.
+      - name: Publish the APK to the mobile-latest GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          apk=$(ls apps/mobile/android/app/build/outputs/apk/debug/*.apk | head -1)
+          cp "$apk" "$RUNNER_TEMP/hermes-mobile-debug.apk"
+          ( cd "$RUNNER_TEMP" && sha256sum hermes-mobile-debug.apk > SHA256SUMS.txt )
+          cat > "$RUNNER_TEMP/notes.md" <<NOTES
+          Automatic debug build of the Hermes Mobile Android app (commit ${GITHUB_SHA:0:8}).
+
+          Install: download \`hermes-mobile-debug.apk\` on the phone and open it
+          (allow "install unknown apps"), or \`adb install -r hermes-mobile-debug.apk\`.
+          Signed with the CI debug keystore — not Play-Store distributable.
+          NOTES
+          REPO="${{ github.repository }}"
+          if gh release view mobile-latest --repo "$REPO" >/dev/null 2>&1; then
+            gh release upload mobile-latest \
+              "$RUNNER_TEMP/hermes-mobile-debug.apk" "$RUNNER_TEMP/SHA256SUMS.txt" \
+              --clobber --repo "$REPO"
+          else
+            gh release create mobile-latest \
+              "$RUNNER_TEMP/hermes-mobile-debug.apk" "$RUNNER_TEMP/SHA256SUMS.txt" \
+              --repo "$REPO" --title "Hermes Mobile (latest Android build)" \
+              --notes-file "$RUNNER_TEMP/notes.md" --prerelease
+          fi
